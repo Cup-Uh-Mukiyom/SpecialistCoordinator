@@ -1,0 +1,165 @@
+{
+  "name": "Preventive Care",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/preventive-care",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f1a751e-9a67-4f5e-854c-155a8bd19fbc",
+      "name": "Webhook",
+      "webhookId": "5152a6f9-faa4-4da0-8088-58c12ecb80bf"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst age = body.age;\nconst gender = body.gender;\nconst family_history = body.family_history;\nconst lifestyle = body.lifestyle;\nif (!age || !gender || !Array.isArray(family_history) || !lifestyle) {\n  throw new Error('Missing required fields (age, gender, family_history, lifestyle)');\n}\nreturn [\n  {\n    json: { age, gender, family_history, lifestyle }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "166587f9-33e0-42f0-9a0b-dc6b708d30eb",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the following:\n- Age: {{$json.age}}\n- Gender: {{$json.gender}}\n- Family history: {{JSON.stringify($json.family_history)}}\n- Lifestyle: {{JSON.stringify($json.lifestyle)}}\n\nRecommend:\n1. A list of preventive health screenings this person should get, with frequency and next due date (use reasonable dates).\n2. For chronic diseases (cancer, cardiovascular, diabetes), give a risk score: \"low\", \"medium\", or \"high\", in a JSON object.\n3. 3 personalized lifestyle or prevention tips.\n\nRespond ONLY with strict JSON in this format and no explanation:\n{\n  \"recommended_screenings\": [\n    {\"test\": \"...\", \"frequency\": \"...\", \"next_due\": \"...\"},\n    {\"test\": \"...\", ...}\n  ],\n  \"risk_profile\": {\"cancer\": \"...\", \"cardiovascular\": \"...\", \"diabetes\": \"...\"},\n  \"personalized_tips\": [\"tip1\", \"tip2\", \"tip3\"]\n}\nThe first character of your response must be '{'.\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        464,
+        0
+      ],
+      "id": "02801fb5-e853-4efe-9aba-90f932513f84",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "mistral:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        608,
+        208
+      ],
+      "id": "2c59ff91-f895-4af4-af96-f21d4f8644f6",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "y1K6muZNnXxmNNYJ",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Adapt field if your AI outputs in 'response' or 'text'\nconst raw = $json[\"response\"] || $json[\"text\"] || \"\";\nlet res;\ntry {\n  res = typeof raw === \"string\" ? JSON.parse(raw) : raw;\n} catch (e) {\n  throw new Error(\"Unable to parse model's response as JSON\");\n}\nreturn [{\n  json: {\n    recommended_screenings: res.recommended_screenings || [],\n    risk_profile: res.risk_profile || {},\n    personalized_tips: res.personalized_tips || []\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "2ffac3ff-87cf-4d15-acea-9348f2812aee",
+      "name": "Parse AI"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "63f9fc69-8a88-4962-adec-6e02393d8f29",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d7737569-d061-45f3-9a53-fe7b8f434489",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "500529db4afc87d64dfabdf7f3aba298af345b563438b16bd1de9e9285caddb6"
+  },
+  "id": "vbDR64CGEQPDYZT0",
+  "tags": []
+}
