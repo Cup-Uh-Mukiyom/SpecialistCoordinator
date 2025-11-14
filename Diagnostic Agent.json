@@ -1,0 +1,165 @@
+{
+  "name": "Diagnostic Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/diagnostic-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a41fcf81-7406-414d-8537-bf0ee28a98ea",
+      "name": "Webhook",
+      "webhookId": "a99c19f9-3d9f-4f01-aeaf-b478f396fdc5"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given these patient details:\n- Age: {{$json.age}}\n- Gender: {{$json.gender}}\n- Symptoms: {{$json.symptoms}}\n\nSuggest:\n1. A short list (up to 3) of probable diagnoses.\n2. Up to 3 recommended next diagnostic steps (tests, exams, checks).\n\nRespond ONLY with valid JSON—no explanations, no comments. Your response must START with '{' and use this format:\n{\n  \"diagnosis\": [\"...\", \"...\", \"...\"],\n  \"next_steps\": [\"...\", \"...\", \"...\"]\n}\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        464,
+        0
+      ],
+      "id": "db949d17-25bc-45d2-b229-391d480c983c",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "mistral:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        736,
+        272
+      ],
+      "id": "6f28ab95-f280-4980-8f4e-62e66cbe8fc1",
+      "name": "Ollama Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "y1K6muZNnXxmNNYJ",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "ae644cdf-5069-4f3f-86bf-162d9d67508b",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nif (!Array.isArray(body.symptoms) || !body.age || !body.gender) {\n  throw new Error(\"Missing required field: symptoms, age, or gender\");\n}\nreturn [{ json: { symptoms: body.symptoms, age: body.age, gender: body.gender } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "13e84f3b-9994-4da8-ae5e-50c9cd947bb7",
+      "name": "Validating"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json[\"response\"] || $json[\"text\"] || \"\";\nraw = raw.match(/{[\\s\\S]*}/); // Extract first JSON object only\nif (raw) raw = raw[0];\nlet res;\ntry {\n  res = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Unable to parse model's response as JSON\");\n}\nreturn [{\n  json: {\n    diagnosis: res.diagnosis || [],\n    next_steps: res.next_steps || []\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "ab233a58-02af-4c07-83bd-5674f037b0f5",
+      "name": "Parsing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parsing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validating": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsing": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7621d45c-3d81-459f-843e-46799a0780a8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "500529db4afc87d64dfabdf7f3aba298af345b563438b16bd1de9e9285caddb6"
+  },
+  "id": "jpN3Rj7GHIYcNO52",
+  "tags": []
+}
