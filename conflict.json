@@ -1,0 +1,165 @@
+{
+  "name": "conflict",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/crisis-detection",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ea8bd8a6-fcd1-472d-bb12-e3d9ea59e852",
+      "name": "Webhook",
+      "webhookId": "3901d817-3ca4-46b9-a3ed-f3b4e9854726"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nif (\n  !Array.isArray(body.symptoms) ||\n  !body.age ||\n  !body.gender ||\n  !body.vital_signs\n) {\n  throw new Error(\"Missing required field: symptoms, age, gender, or vital_signs\");\n}\nreturn [{\n  json: {\n    symptoms: body.symptoms,\n    age: body.age,\n    gender: body.gender,\n    vital_signs: body.vital_signs,\n    mental_health_flags: body.mental_health_flags || []\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "70944944-f126-4a6d-8e95-893d468cc88c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the following real-time patient data:\n- Age: {{$json.age}}\n- Gender: {{$json.gender}}\n- Symptoms: {{$json.symptoms}}\n- Vital signs: {{$json.vital_signs}}\n- Mental health flags: {{$json.mental_health_flags}}\n\nIs this patient currently experiencing a medical or mental health crisis requiring urgent intervention?\n\nRespond ONLY with strict JSON (no explanations, no comments, start with '{') using this format:\n{\n  \"crisis_detected\": (true|false),\n  \"risk_score\": (number from 0 to 1),\n  \"reason\": \"...\",\n  \"urgent_interventions\": [\"...\", \"...\"]\n}\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        416,
+        0
+      ],
+      "id": "916ec16d-db6a-4213-81ed-bb738b3b9837",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "mistral:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        704,
+        224
+      ],
+      "id": "89994d5b-d593-47bf-83d7-55019b32f950",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "y1K6muZNnXxmNNYJ",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json[\"response\"] || $json[\"text\"] || \"\";\nraw = raw.match(/{[\\s\\S]*}/); // Extract the first JSON object\nif (raw) raw = raw[0];\nlet res;\ntry {\n  res = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Unable to parse model's response as JSON\");\n}\nreturn [{\n  json: {\n    crisis_detected: res.crisis_detected || false,\n    risk_score: res.risk_score || 0,\n    reason: res.reason || \"\",\n    urgent_interventions: res.urgent_interventions || []\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "a404e9e2-71b4-4ec3-b77b-58cc8988f9b4",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        976,
+        0
+      ],
+      "id": "92138b8a-3cdf-4173-9f49-4dedbec87eaf",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "60343aaa-c04d-4fb0-ab29-e6e908c9a288",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "500529db4afc87d64dfabdf7f3aba298af345b563438b16bd1de9e9285caddb6"
+  },
+  "id": "PXcL3sKNFjjQkLF8",
+  "tags": []
+}
